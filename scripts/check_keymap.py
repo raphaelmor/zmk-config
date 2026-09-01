@@ -360,6 +360,22 @@ def main(path):
         else:
             print("  ok  all %d two-key rules match, no extras" % total)
 
+        # The module keeps one pressed_bindings slot per instance, so an adaptive
+        # reachable from two places could be held twice. Counted on the
+        # PREPROCESSED source, which has no comments to miscount.
+        shared = []
+        for label in sorted(ak_letter):
+            refs = len(re.findall(r"&%s\b" % label, src))
+            if refs > 1:
+                shared.append("%s referenced %d times" % (label, refs))
+        if shared:
+            ok = False
+            for s in shared:
+                print("  !! %s -- one pressed_bindings slot per instance" % s)
+        else:
+            print("  ok  each of the %d adaptives is referenced exactly once"
+                  % len(ak_letter))
+
     # ---- combos -------------------------------------------------------------
     print("\n=== COMBOS ===")
     combos = COMBO_RE.findall(src)

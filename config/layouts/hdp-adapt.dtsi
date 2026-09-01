@@ -35,6 +35,30 @@
  *   keydown-to-keydown event.time window, so expect to re-tune. moutis runs 350.
  *   my_cc_term (200) is QMK's RAMO_ADAPT_SHIFT_TERM. moutis runs ak_term * 4.
  *
+ * KNOWN DIVERGENCE: WHAT COUNTS AS "THE PRIOR KEY"
+ *   QMK recorded the keycode you PRESSED (ramo_process_record.c:76, after
+ *   stripping mod-taps). This module records the keycode that was EMITTED — its
+ *   listener stores the id from each zmk_keycode_state_changed event, and when a
+ *   rule replaces a key the pressed key's own keycode is never raised at all.
+ *
+ *   For most rules that makes no difference, because the last key emitted is the
+ *   key pressed (P D -> "W D" still ends on D). It differs for the replacement
+ *   rules, where the next keystroke sees the SUBSTITUTED letter as its prior.
+ *
+ *   Two places that can actually cascade, found by crossing every rule's last
+ *   emitted letter against every rule's trigger:
+ *     G J -> "th"  emits H, and ak_K has a rule on H. So "g j k" gives "gtnk"
+ *                  here where QMK gave "gthk".
+ *     M W -> "mp"  emits P, and both ak_D and ak_F have rules on P. So "m w d"
+ *                  gives "mpwd" and "m w f" gives "mps".
+ *   Every other emitted letter (L D N S T U) is not a trigger anywhere, so those
+ *   rules cannot chain.
+ *
+ *   Left as-is: none of gjk, mwd or mwf is a plausible English sequence, and
+ *   reasoning about the text as written is arguably more correct than reasoning
+ *   about the keys pressed. Documented so it is a decision rather than a surprise.
+ *   Confirm on hardware before trusting the analysis.
+ *
  * COVERAGE
  *   Every letter except Q gets CommaMagic. Q has no key of its own on this base —
  *   it exists only as the W+M combo, whose output runs through a macro rather than
