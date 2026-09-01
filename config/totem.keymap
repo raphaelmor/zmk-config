@@ -13,6 +13,7 @@
  *   keynames_totem.h        38 key position names, shared with QMK and moutis
  *   ramo/ramo_config.dtsi   layer indices, timings, stock-behaviour overrides
  *   layouts/hdp-config.h    the Hands Down Promethium base
+ *   layouts/hdp-adapt.dtsi  its 20 adaptive rules + CommaMagic
  *   layouts/cmk-config.h    the Colemak base
  *   layouts/layers_def.h    the six non-alpha layers
  *   ramo/ramo_behaviors.dtsi hold-taps, mod-morphs, linger keys, tap dances
@@ -79,6 +80,7 @@
     behaviors {
 
 #include "ramo/ramo_behaviors.dtsi"
+#include "layouts/hdp-adapt.dtsi"
 
     };
 

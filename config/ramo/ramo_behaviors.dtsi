@@ -96,6 +96,48 @@
     };
 
 /*
+ * HOME ROW MODS WHOSE TAP IS AN ADAPTIVE KEY — Hands Down only
+ *
+ * Ten letters on the Hands Down base are both a modifier hold and an adaptive-key
+ * tap. A hold-tap's bindings property is a plain phandle list, so #binding-cells is
+ * never checked and a 0-cell behavior is legal on either side; the parameters get
+ * handed over and the adaptive ignores them. moutis runs exactly this shape in
+ * production (moutis_behaviors.dtsi:71-120, e.g. mt_T: bindings = <&kp>, <&ak_T>).
+ *
+ * Used as: &mt_S LCTRL S   — the first parameter is the modifier, the second is
+ * decorative and documents which letter the key types. Both reach the adaptive,
+ * which discards them and emits its own default.
+ *
+ * Colemak keeps plain &hml / &hmr above: QMK gated the adaptives to the Hands Down
+ * base, and here that gating is structural because these behaviors are only bound
+ * on the Hands Down layer.
+ *
+ * DOT and FSLH on the Hands Down top row stay on plain &hmr — they are not letters,
+ * so they carry neither an adaptive rule nor CommaMagic.
+ */
+    mt_S: mt_S { my_hrm_config; bindings = <&kp>, <&ak_S>; hold-trigger-key-positions = <KEYS_R THUMBS>; };
+    mt_N: mt_N { my_hrm_config; bindings = <&kp>, <&ak_N>; hold-trigger-key-positions = <KEYS_R THUMBS>; };
+    mt_T: mt_T { my_hrm_config; bindings = <&kp>, <&ak_T>; hold-trigger-key-positions = <KEYS_R THUMBS>; };
+    mt_H: mt_H { my_hrm_config; bindings = <&kp>, <&ak_H>; hold-trigger-key-positions = <KEYS_R THUMBS>; };
+    mt_G: mt_G { my_hrm_config; bindings = <&kp>, <&ak_G>; hold-trigger-key-positions = <KEYS_R THUMBS>; };
+    mt_M: mt_M { my_hrm_config; bindings = <&kp>, <&ak_M>; hold-trigger-key-positions = <KEYS_R THUMBS>; };
+
+    mt_A: mt_A { my_hrm_config; bindings = <&kp>, <&ak_A>; hold-trigger-key-positions = <KEYS_L THUMBS>; };
+    mt_E: mt_E { my_hrm_config; bindings = <&kp>, <&ak_E>; hold-trigger-key-positions = <KEYS_L THUMBS>; };
+    mt_I: mt_I { my_hrm_config; bindings = <&kp>, <&ak_I>; hold-trigger-key-positions = <KEYS_L THUMBS>; };
+    mt_C: mt_C { my_hrm_config; bindings = <&kp>, <&ak_C>; hold-trigger-key-positions = <KEYS_L THUMBS>; };
+
+/*
+ * The R thumb, whose tap is also an adaptive so R gets CommaMagic. R is
+ * Promethium's signature key — an alpha on a thumb — so it needs the same
+ * treatment as the home row. Used as &lt_R l_sym R.
+ */
+    lt_R: lt_R {
+        my_lt_config;
+        bindings = <&mo>, <&ak_R>;
+    };
+
+/*
  * THUMB LAYER TAPS
  *
  * One generic instance covers five of the six thumbs on both bases, because the

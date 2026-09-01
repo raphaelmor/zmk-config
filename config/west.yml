@@ -4,12 +4,21 @@ manifest:
   remotes:
     - name: zmkfirmware
       url-base: https://github.com/zmkfirmware
+    - name: urob
+      url-base: https://github.com/urob
     # Additional modules containing boards/shields/custom code can be listed here as well
     # See https://docs.zephyrproject.org/3.2.0/develop/west/manifest.html#projects
   projects:
     - name: zmk
       remote: zmkfirmware
       import: app/west.yml
+    # Adaptive keys: send a different behavior based on the previously pressed key.
+    # This is what carries the Hands Down Promethium adaptive rules and CommaMagic.
+    # The module's README says the revision should match the ZMK release, and v0.3
+    # is a real tag whose zmk_behavior_queue_add signature matches this ZMK tree.
+    - name: zmk-adaptive-key
+      remote: urob
+      revision: v0.3
     - name: zmk-keyboard-totem
       url: https://github.com/raphaelmor/zmk-keyboard-totem
       # Pinned, not floating on main: this is your own fork, so an unrelated push

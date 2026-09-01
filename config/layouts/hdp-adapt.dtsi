@@ -1,0 +1,226 @@
+/*
+ * hdp-adapt.dtsi — adaptive keys for the Hands Down Promethium base
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Included from inside the behaviors { } block in totem.keymap.
+ * Needs urob/zmk-adaptive-key (see config/west.yml).
+ *
+ * WHAT THIS PORTS
+ *   users/raphaelmor/ramo_adaptive.c  — 20 of its 22 rules
+ *   users/raphaelmor/ramo_process_record.c:44-60 — the comma-leader shift, here
+ *                                     under moutis' name, CommaMagic
+ *
+ * Every rule eliminates a same-finger bigram or a scissor by rewriting the roll.
+ * The QMK engine either replaced the pressed key (result = false) or let it
+ * through after inserting something (result = true); a ZMK adaptive's bindings
+ * always REPLACE the default, so a rule that let the key through has to re-emit
+ * it explicitly. That is why, for example, MG -> LG reads
+ * <&kp BSPC &kp L &kp G> and not just <&kp BSPC &kp L>.
+ *
+ * THE TWO 3-KEY RULES ARE NOT HERE. P·B·D -> PWD and W·M·G -> WML need two keys
+ * of history and the module tracks one. HDPM-parity.md:216-217 already records
+ * that 3-key rules fail at roughly the square of the 2-key rate, so they were the
+ * least reliable part of the QMK build.
+ *
+ * GATING IS STRUCTURAL, NOT CONDITIONAL. QMK checked the active default layer at
+ * runtime (ramo_adaptive.c:8-10) because one keymap served both bases. Here these
+ * behaviors are only ever bound on the Hands Down layer, so Colemak types clean
+ * with no check at all.
+ *
+ * TIMING
+ *   my_ak_term (175) is QMK's RAMO_ADAPTIVE_TERM, tuned empirically 50 -> 100 ->
+ *   175 because adaptives fix SFBs and scissors, which are slow motions by
+ *   definition. ZMK's max-prior-idle-ms is not measured identically to QMK's
+ *   keydown-to-keydown event.time window, so expect to re-tune. moutis runs 350.
+ *   my_cc_term (200) is QMK's RAMO_ADAPT_SHIFT_TERM. moutis runs ak_term * 4.
+ *
+ * COVERAGE
+ *   Every letter except Q gets CommaMagic. Q has no key of its own on this base —
+ *   it exists only as the W+M combo, whose output runs through a macro rather than
+ *   a keycode, so there is nothing for an adaptive to hang off. Z works because
+ *   its combo binds &ak_Z directly.
+ *
+ * NAMING follows moutis: ak_ = an alpha that considers the prior key.
+ */
+
+/*
+ * CommaMagic — type a comma, then a letter within my_cc_term, and the comma is
+ * deleted and the letter capitalised. ", the" -> "The".
+ *
+ * There is no way to express this once; it needs a trigger on every letter,
+ * because the transformation happens when the LETTER is pressed. moutis writes it
+ * out the same way and says it works flawlessly.
+ *
+ * The comma key itself stays a plain &kp COMMA, as in QMK. moutis also puts
+ * hold-for-CapsLock and ",," -> Caps Word on it; both are additions beyond the QMK
+ * spec, so they are left out to keep the Totem and the Corne in muscle-memory sync.
+ * HDPM-parity.md:71 tracks ",," as canonical-but-not-done if you ever want it.
+ */
+#define CAP_TRIGGER(LETTER) \
+    cap { trigger-keys = <COMMA>; max-prior-idle-ms = <my_cc_term>; \
+          bindings = <&kp BSPC &kp LS(LETTER)>; };
+
+/*
+ * Shared node boilerplate. This has to be an OBJECT-like macro: inside a
+ * function-like macro body "#" is the stringify operator and must be followed by a
+ * parameter, so "#binding-cells" would not compile there. CAP_TRIGGER above takes a
+ * parameter but contains no "#", so it is safe as a function-like macro.
+ */
+#define AK_CONFIG \
+    compatible = "zmk,behavior-adaptive-key"; \
+    #binding-cells = <0>
+
+// ---- letters that carry CommaMagic and nothing else -------------------------
+    ak_A: ak_A { AK_CONFIG; bindings = <&kp A>; CAP_TRIGGER(A) };
+    ak_C: ak_C { AK_CONFIG; bindings = <&kp C>; CAP_TRIGGER(C) };
+    ak_I: ak_I { AK_CONFIG; bindings = <&kp I>; CAP_TRIGGER(I) };
+    ak_L: ak_L { AK_CONFIG; bindings = <&kp L>; CAP_TRIGGER(L) };
+    ak_N: ak_N { AK_CONFIG; bindings = <&kp N>; CAP_TRIGGER(N) };
+    ak_O: ak_O { AK_CONFIG; bindings = <&kp O>; CAP_TRIGGER(O) };
+    ak_R: ak_R { AK_CONFIG; bindings = <&kp R>; CAP_TRIGGER(R) };
+    ak_S: ak_S { AK_CONFIG; bindings = <&kp S>; CAP_TRIGGER(S) };
+    ak_T: ak_T { AK_CONFIG; bindings = <&kp T>; CAP_TRIGGER(T) };
+    ak_U: ak_U { AK_CONFIG; bindings = <&kp U>; CAP_TRIGGER(U) };
+    ak_X: ak_X { AK_CONFIG; bindings = <&kp X>; CAP_TRIGGER(X) };
+    ak_Y: ak_Y { AK_CONFIG; bindings = <&kp Y>; CAP_TRIGGER(Y) };
+    ak_Z: ak_Z { AK_CONFIG; bindings = <&kp Z>; CAP_TRIGGER(Z) };
+
+// ---- left hand -------------------------------------------------------------
+
+    ak_D: ak_D {
+        AK_CONFIG;
+        bindings = <&kp D>;
+        CAP_TRIGGER(D)
+        // P D -> PWD. QMK inserted W and let D through, so D is re-emitted here.
+        pwd { trigger-keys = <P>; max-prior-idle-ms = <my_ak_term>;
+              bindings = <&kp W &kp D>; };
+    };
+
+    ak_F: ak_F {
+        AK_CONFIG;
+        bindings = <&kp F>;
+        CAP_TRIGGER(F)
+        // P F -> PS. S replaces F.
+        ps { trigger-keys = <P>; max-prior-idle-ms = <my_ak_term>;
+             bindings = <&kp S>; };
+    };
+
+    ak_G: ak_G {
+        AK_CONFIG;
+        bindings = <&kp G>;
+        CAP_TRIGGER(G)
+        // K G -> KL. Inner-column stretch; one of the slowest motions, so one of
+        // the most sensitive to my_ak_term being too tight.
+        kl { trigger-keys = <K>; max-prior-idle-ms = <my_ak_term>;
+             bindings = <&kp L>; };
+        // M G -> LG. Deletes the M, types L, then G.
+        lg { trigger-keys = <M>; max-prior-idle-ms = <my_ak_term>;
+             bindings = <&kp BSPC &kp L &kp G>; };
+        // J G -> JPG.
+        jpg { trigger-keys = <J>; max-prior-idle-ms = <my_ak_term>;
+              bindings = <&kp P &kp G>; };
+        // W G -> WD.
+        wd { trigger-keys = <W>; max-prior-idle-ms = <my_ak_term>;
+             bindings = <&kp D>; };
+    };
+
+    ak_H: ak_H {
+        AK_CONFIG;
+        bindings = <&kp H>;
+        CAP_TRIGGER(H)
+        // K H -> KN. Same finger, index to index — the slowest rule in the set.
+        kn { trigger-keys = <K>; max-prior-idle-ms = <my_ak_term>;
+             bindings = <&kp N>; };
+    };
+
+    ak_J: ak_J {
+        AK_CONFIG;
+        bindings = <&kp J>;
+        CAP_TRIGGER(J)
+        // G J -> G then "th", for words like "length".
+        gth { trigger-keys = <G>; max-prior-idle-ms = <my_ak_term>;
+              bindings = <&kp T &kp H>; };
+        // W J -> WL. The V J rule is absent on purpose: V+J is the tilde combo,
+        // and combos resolve before the adaptive engine, so it was unreachable.
+        wl { trigger-keys = <W>; max-prior-idle-ms = <my_ak_term>;
+             bindings = <&kp L>; };
+    };
+
+    ak_K: ak_K {
+        AK_CONFIG;
+        bindings = <&kp K>;
+        CAP_TRIGGER(K)
+        // M K -> LK.
+        lk { trigger-keys = <M>; max-prior-idle-ms = <my_ak_term>;
+             bindings = <&kp BSPC &kp L &kp K>; };
+        // H K -> NK.
+        nk { trigger-keys = <H>; max-prior-idle-ms = <my_ak_term>;
+             bindings = <&kp BSPC &kp N &kp K>; };
+    };
+
+    ak_M: ak_M {
+        AK_CONFIG;
+        bindings = <&kp M>;
+        CAP_TRIGGER(M)
+        // G M -> GL and V M -> VL. QMK reached both through a case fallthrough to
+        // the same action, so they merge into one trigger here.
+        gl_vl { trigger-keys = <G V>; max-prior-idle-ms = <my_ak_term>;
+                bindings = <&kp L>; };
+    };
+
+    ak_P: ak_P {
+        AK_CONFIG;
+        bindings = <&kp P>;
+        CAP_TRIGGER(P)
+        // F P -> SP.
+        sp { trigger-keys = <F>; max-prior-idle-ms = <my_ak_term>;
+             bindings = <&kp BSPC &kp S &kp P>; };
+    };
+
+    ak_V: ak_V {
+        AK_CONFIG;
+        bindings = <&kp V>;
+        CAP_TRIGGER(V)
+        // G V -> GT.
+        gt { trigger-keys = <G>; max-prior-idle-ms = <my_ak_term>;
+             bindings = <&kp T>; };
+        // M V -> LV.
+        lv { trigger-keys = <M>; max-prior-idle-ms = <my_ak_term>;
+             bindings = <&kp BSPC &kp L &kp V>; };
+    };
+
+    ak_W: ak_W {
+        AK_CONFIG;
+        bindings = <&kp W>;
+        CAP_TRIGGER(W)
+        // G W -> GD.
+        gd { trigger-keys = <G>; max-prior-idle-ms = <my_ak_term>;
+             bindings = <&kp D>; };
+        // M W -> MP. Collides with "firmware" if my_ak_term is too generous.
+        mp { trigger-keys = <M>; max-prior-idle-ms = <my_ak_term>;
+             bindings = <&kp P>; };
+    };
+
+// ---- right hand ------------------------------------------------------------
+
+    ak_B: ak_B {
+        AK_CONFIG;
+        bindings = <&kp B>;
+        CAP_TRIGGER(B)
+        // Y B -> IB. Same two keys as the Caps Word combo, which is fine: a
+        // simultaneous press resolves as the combo before this ever runs, a
+        // sequential roll is this rule. Collides with "keyboard" if the window is
+        // too generous.
+        ib { trigger-keys = <Y>; max-prior-idle-ms = <my_ak_term>;
+             bindings = <&kp BSPC &kp I &kp B>; };
+    };
+
+    ak_E: ak_E {
+        AK_CONFIG;
+        bindings = <&kp E>;
+        CAP_TRIGGER(E)
+        // A E -> AU. Keeps the roll on the home row.
+        au { trigger-keys = <A>; max-prior-idle-ms = <my_ak_term>;
+             bindings = <&kp U>; };
+    };

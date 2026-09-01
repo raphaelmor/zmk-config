@@ -10,14 +10,19 @@ Checks:
   4. both alpha bases put the expected letter on the expected position
   5. every behavior invocation supplies exactly as many parameters as that
      behavior's #binding-cells declares
+  6. the adaptive-key rule set matches the QMK source it was ported from
 
 Check 4 is the one that earns its keep: it compares the built keymap against the
 letter-to-position mapping taken from the QMK userspace, which stays the spec
-source of truth (users/raphaelmor/layers/{HDP,CMK}-defs.h).
+source of truth (users/raphaelmor/layers/{HDP,CMK}-defs.h). It follows letters
+through the adaptive layer, so &ak_V resolves via that behavior's default binding.
 
-Check 5 catches the class of bug where a 0-cell behavior is handed a parameter
-that devicetree then silently drops, or where a multi-token macro like BT_CLR
-(which expands to "BT_CLR_CMD 0") is miscounted.
+Check 5 catches the class of bug where a 0-cell behavior is handed a parameter that
+devicetree then silently drops, or where a multi-token macro like BT_CLR (which
+expands to "BT_CLR_CMD 0") is miscounted.
+
+Check 6 guards the thing most likely to rot: 20 adaptive rules transcribed by hand
+from ramo_adaptive.c, plus CommaMagic on every letter.
 """
 import re
 import sys
@@ -66,7 +71,29 @@ EXPECT_ALPHAS = {
     },
 }
 
-# Only real keymap layers carry display-name; behavior nodes do not.
+# The 20 two-key adaptive rules, transcribed from users/raphaelmor/ramo_adaptive.c.
+# host letter -> {prior letter: output sequence}. The two 3-key rules there
+# (P.B.D -> PWD, W.M.G -> WML) are deliberately absent: the module tracks one
+# prior key.
+EXPECT_RULES = {
+    "D": {"P": "W D"},
+    "F": {"P": "S"},
+    "G": {"K": "L", "M": "BSPC L G", "J": "P G", "W": "D"},
+    "H": {"K": "N"},
+    "J": {"G": "T H", "W": "L"},
+    "K": {"M": "BSPC L K", "H": "BSPC N K"},
+    "M": {"G": "L", "V": "L"},
+    "P": {"F": "BSPC S P"},
+    "V": {"G": "T", "M": "BSPC L V"},
+    "W": {"G": "D", "M": "P"},
+    "B": {"Y": "BSPC I B"},
+    "E": {"A": "U"},
+}
+
+# Letters that get CommaMagic. Q is excluded: it has no key on the Hands Down base,
+# only the W+M combo, whose output goes through a macro rather than a keycode.
+EXPECT_COMMAMAGIC = sorted(set("ABCDEFGHIJKLMNOPRSTUVWXYZ"))
+
 LAYER_RE = re.compile(
     r"(\w+)\s*\{\s*display-name\s*=\s*\"([^\"]*)\"\s*;\s*"
     r"bindings\s*=\s*<(.*?)>\s*;", re.S)
@@ -75,31 +102,54 @@ COMBO_RE = re.compile(
     r"(combo_\w+)\s*\{\s*bindings\s*=\s*<(.*?)>\s*;\s*"
     r"key-positions\s*=\s*<(.*?)>\s*;\s*layers\s*=\s*<(.*?)>\s*;", re.S)
 
-# HID keyboard page 0x07, A=0x04 .. Z=0x1D.
-USAGE_RE = re.compile(r"\(0x07\) << 16\) \| \(0x([0-9A-Fa-f]+)\)")
-
-# A labelled leaf node declaring #binding-cells. Leaf, so no nested braces.
-CELLS_RE = re.compile(
-    r"(\w+)\s*:\s*\w+\s*\{[^{}]*?#binding-cells\s*=\s*<(\d+)>", re.S)
-
-# Any bindings property, plus the node body preceding it, so the owner can be
-# identified. Behavior nodes deliberately leave parameters off their child
-# bindings (the parent injects them), so only keymap layers, combos and macros
-# are arity-checked.
+NODE_RE = re.compile(r"(\w+)\s*:\s*(\w+)\s*\{")
 BINDINGS_RE = re.compile(r"bindings\s*=\s*([^;]*);", re.S)
+CELLS_RE = re.compile(r"#binding-cells\s*=\s*<(\d+)>")
+
+# HID keyboard page 0x07: A=0x04 .. Z=0x1D, and a few named keys we want to show.
+USAGE_RE = re.compile(r"\(0x07\) << 16\) \| \(0x([0-9A-Fa-f]+)\)")
+NAMED = {0x2A: "BSPC", 0x28: "RET", 0x2C: "SPACE", 0x2B: "TAB", 0x29: "ESC"}
+
+
+def usage_name(code):
+    if 0x04 <= code <= 0x1D:
+        return chr(ord("A") + code - 0x04)
+    return NAMED.get(code, "0x%02X" % code)
+
+
+def scan_nodes(src):
+    """Return {label: body} for every labelled node, by brace matching.
+
+    Regex alone cannot do this: adaptive-key nodes contain child nodes, so any
+    [^{}] body pattern stops at the first child.
+    """
+    out = {}
+    for m in NODE_RE.finditer(src):
+        label, start = m.group(1), m.end() - 1
+        depth, i, n = 0, start, len(src)
+        while i < n:
+            if src[i] == "{":
+                depth += 1
+            elif src[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            i += 1
+        out[label] = src[start + 1:i]
+    return out
 
 
 def tokenize(group):
     """Split a bindings value into behavior refs and parameter tokens.
 
     A parenthesised expression counts as a single parameter no matter how much
-    whitespace it contains, which is what makes preprocessed keycodes work:
-    they arrive as things like ((((0x07) << 16) | (0x0B))).
+    whitespace it contains, which is what makes preprocessed keycodes work: they
+    arrive as things like ((((0x07) << 16) | (0x0B))).
 
-    "<" and ">" are treated as separators rather than parsed, because a cell list
-    delimiter and the left-shift inside a keycode expression look identical to a
-    regex. Shifts only ever appear inside parentheses, which are consumed whole,
-    so the delimiters are the only "<" left at depth zero.
+    "<" and ">" are separators rather than parsed, because a cell-list delimiter and
+    the left-shift inside a keycode expression look identical to a regex. Shifts only
+    appear inside parentheses, which are consumed whole, so the delimiters are the
+    only "<" left at depth zero.
     """
     out, i, n = [], 0, len(group)
     while i < n:
@@ -137,6 +187,10 @@ def tokenize(group):
     return out
 
 
+def bindings_of(body):
+    return [t for t in tokenize(body) if t[0] == "beh"]
+
+
 def check_arity(group, cells, where, problems):
     """Walk a cell list the way devicetree does: each ref consumes its cells."""
     toks = tokenize(group)
@@ -163,28 +217,31 @@ def check_arity(group, cells, where, problems):
         i = j
 
 
-def bindings_of(body):
-    """Split a bindings block into individual bindings (each starts with &)."""
-    return [p.strip() for p in re.split(r"(?=&\w+)", body) if p.strip().startswith("&")]
-
-
-def letter_at(body, index):
-    """Decode binding `index` to a letter, whether plain &kp or a mod-tap's tap."""
-    parts = bindings_of(body)
-    if index >= len(parts):
-        return "<missing>"
-    hits = USAGE_RE.findall(parts[index])
-    if hits:
-        code = int(hits[-1], 16)
-        if 0x04 <= code <= 0x1D:
-            return chr(ord("A") + code - 0x04)
-        return "0x%02X" % code
-    return parts[index].split()[0]
+def seq_of(group):
+    """Render a bindings value as a space-separated list of key names."""
+    names = []
+    for kind, val in tokenize(group):
+        if kind == "param":
+            hits = USAGE_RE.findall(val)
+            if hits:
+                names.append(usage_name(int(hits[-1], 16)))
+    return " ".join(names)
 
 
 def main(path):
     src = open(path).read()
     ok = True
+    nodes = scan_nodes(src)
+    cells = {label: int(CELLS_RE.search(body).group(1))
+             for label, body in nodes.items() if CELLS_RE.search(body)}
+
+    # adaptive default bindings, so &ak_V can be resolved back to a letter
+    ak_letter = {}
+    for label, body in nodes.items():
+        if "zmk,behavior-adaptive-key" in body:
+            m = BINDINGS_RE.search(body)
+            if m:
+                ak_letter[label] = seq_of(m.group(1))
 
     layers = LAYER_RE.findall(src)
     by_node = {node: body for node, _disp, body in layers}
@@ -206,6 +263,28 @@ def main(path):
     else:
         print("\n  ok  %d layers, in the expected order" % len(layers))
 
+    def letter_at(body, index):
+        """Decode binding `index`: plain &kp, a mod-tap's tap, or an adaptive."""
+        parts = [v for k, v in tokenize(body) if k == "beh"]
+        # rebuild each binding with its params so params stay attached
+        toks, groups, cur = tokenize(body), [], None
+        for kind, val in toks:
+            if kind == "beh":
+                cur = [val]
+                groups.append(cur)
+            elif cur is not None:
+                cur.append(val)
+        if index >= len(groups):
+            return "<missing>"
+        grp = groups[index]
+        label = grp[0][1:]
+        if label in ak_letter:                      # &ak_V -> its default binding
+            return ak_letter[label]
+        hits = USAGE_RE.findall(" ".join(grp[1:]))  # &kp X or &mt_X MOD X
+        if hits:
+            return usage_name(int(hits[-1], 16))
+        return grp[0]
+
     for node, expect in EXPECT_ALPHAS.items():
         print("\n=== ALPHAS: %s ===" % node)
         body = by_node.get(node)
@@ -226,10 +305,66 @@ def main(path):
         else:
             print("  ok  all %d letters on their expected positions" % len(expect))
 
+    # ---- adaptive rules -----------------------------------------------------
+    if ak_letter:
+        print("\n=== ADAPTIVE RULES vs ramo_adaptive.c ===")
+        missing_cap, rule_problems = [], []
+        for letter in EXPECT_COMMAMAGIC:
+            label = "ak_%s" % letter
+            if label not in nodes:
+                missing_cap.append(letter)
+                continue
+            body = nodes[label]
+            if "cap {" not in body and "cap{" not in body:
+                missing_cap.append(letter)
+        if missing_cap:
+            ok = False
+            print("  !! no CommaMagic on: %s" % " ".join(missing_cap))
+        else:
+            print("  ok  CommaMagic on all %d letters (Q excluded by design)"
+                  % len(EXPECT_COMMAMAGIC))
+
+        total = 0
+        for host, rules in sorted(EXPECT_RULES.items()):
+            body = nodes.get("ak_%s" % host)
+            if body is None:
+                rule_problems.append("ak_%s missing entirely" % host)
+                continue
+            # every trigger child except the CommaMagic one
+            found = {}
+            for tm in re.finditer(
+                    r"(\w+)\s*\{\s*trigger-keys\s*=\s*<(.*?)>\s*;.*?"
+                    r"bindings\s*=\s*([^;]*);", body, re.S):
+                name, trig, binds = tm.group(1), tm.group(2), tm.group(3)
+                trig_names = [usage_name(int(h, 16))
+                              for h in USAGE_RE.findall(trig)]
+                if name == "cap":
+                    continue
+                for t in trig_names:
+                    found[t] = seq_of(binds)
+            for prior, want in sorted(rules.items()):
+                total += 1
+                got = found.get(prior)
+                if got != want:
+                    rule_problems.append(
+                        "%s after %s: want %r, got %r" % (host, prior, want, got))
+            extra = set(found) - set(rules)
+            for e in sorted(extra):
+                rule_problems.append(
+                    "%s after %s: rule not in ramo_adaptive.c (%r)"
+                    % (host, e, found[e]))
+        if rule_problems:
+            ok = False
+            for p in rule_problems:
+                print("  !! %s" % p)
+        else:
+            print("  ok  all %d two-key rules match, no extras" % total)
+
+    # ---- combos -------------------------------------------------------------
     print("\n=== COMBOS ===")
     combos = COMBO_RE.findall(src)
     items, seen = [], {}
-    for name, _binding, pos, layers_prop in combos:
+    for name, binding, pos, layers_prop in combos:
         positions = [int(p) for p in pos.split()]
         note = ""
         out_of_range = [p for p in positions if not 0 <= p < TOTEM_KEYS]
@@ -252,8 +387,6 @@ def main(path):
     else:
         print("\n  ok  %d combos" % len(combos))
 
-    # A combo whose keys are a subset of another's, sharing a layer, always wins —
-    # the superset can then never fire.
     shadowed = False
     for na, sa, la in items:
         for nb, sb, lb in items:
@@ -266,27 +399,19 @@ def main(path):
 
     # ---- parameter arity ----------------------------------------------------
     print("\n=== PARAMETER ARITY ===")
-    cells = {label: int(n) for label, n in CELLS_RE.findall(src)}
     print("  %d behaviors declare #binding-cells" % len(cells))
-
     problems = []
-
-    # keymap layers
     for node, _disp, body in layers:
         check_arity(body, cells, node, problems)
-
-    # combos
     for name, binding, _pos, _lp in combos:
         check_arity(binding, cells, name, problems)
-
-    # macros: parameters here are real, unlike a hold-tap's child bindings
-    for mnode in re.finditer(
-            r"(\w+)\s*:\s*\w+\s*\{([^{}]*?compatible\s*=\s*"
-            r"\"zmk,behavior-macro\"[^{}]*?)\}", src, re.S):
-        label, body = mnode.group(1), mnode.group(2)
-        m = BINDINGS_RE.search(body)
-        if m:
-            check_arity(m.group(1), cells, "macro %s" % label, problems)
+    for label, body in nodes.items():
+        # macros and adaptives supply real parameters; a hold-tap's child bindings
+        # deliberately do not, because the parent injects them.
+        if ("zmk,behavior-macro" in body
+                or "zmk,behavior-adaptive-key" in body):
+            for m in BINDINGS_RE.finditer(body):
+                check_arity(m.group(1), cells, "%s" % label, problems)
 
     if problems:
         ok = False

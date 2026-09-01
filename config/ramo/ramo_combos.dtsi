@@ -55,7 +55,7 @@
  * then backspaced the u (ramo_combos.c:154-166); this never types it.
  */
 COMBO_ON(qu,    &lk_qu Q 0,      LT3 LT1,     l_hdp)          // W+M -> qu   (hold: Q)
-COMBO_ON(z,     &kp Z,           LM3 LM1,     l_hdp)          // N+H -> z
+COMBO_ON(z,     &ak_Z,           LM3 LM1,     l_hdp)          // N+H -> z
 
 /*
  * H-DIGRAPH — the one combo shared by both bases.

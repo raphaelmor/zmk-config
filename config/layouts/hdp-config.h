@@ -39,25 +39,40 @@
 
 #define HDP_label "HD-Pm"
 
+/*
+ * Every letter is an adaptive key (&ak_X or a hold-tap whose tap is one), which is
+ * what carries the 20 Promethium adaptive rules and CommaMagic — see
+ * layouts/hdp-adapt.dtsi. The letter each key types lives in that file, as the
+ * adaptive's default binding, not here.
+ *
+ * Q and Z are the exceptions. Neither has a key on this base: Q is the W+M combo and
+ * Z is the N+H combo. The Z combo binds &ak_Z so it still gets CommaMagic; Q's runs
+ * through a macro, so it does not.
+ *
+ * HASH, DOT, FSLH, DQT, SQT, COMMA and MINUS stay plain — not letters, so no
+ * adaptive rule and no CommaMagic.
+ */
 //                  LT4              LT3              LT2                LT1              LT0
-#define HDP_LT      &kp V            &kp W            &hml HYPER G       &hml MEH M       &kp J
-#define HDP_LM      &hml LCTRL S     &hml LALT N      &hml LGUI T        &hml LSHFT H     &kp K
-#define HDP_LB      &kp F            &kp P            &kp D              &kp L            &kp X
+#define HDP_LT      &ak_V            &ak_W            &mt_G HYPER G      &mt_M MEH M      &ak_J
+#define HDP_LM      &mt_S LCTRL S    &mt_N LALT N     &mt_T LGUI T       &mt_H LSHFT H    &ak_K
+#define HDP_LB      &ak_F            &ak_P            &ak_D              &ak_L            &ak_X
 
 //                  RT0              RT1              RT2                RT3              RT4
 #define HDP_RT      &kp HASH         &hmr MEH DOT     &hmr HYPER FSLH    &kp DQT          &kp SQT
-#define HDP_RM      &kp COMMA        &hmr RSHFT A     &hmr RGUI E        &hmr RALT I      &hmr RCTRL C
-#define HDP_RB      &kp MINUS        &kp U            &kp O              &kp Y            &kp B
+#define HDP_RM      &kp COMMA        &mt_A RSHFT A    &mt_E RGUI E       &mt_I RALT I     &mt_C RCTRL C
+#define HDP_RB      &kp MINUS        &ak_U            &ak_O              &ak_Y            &ak_B
 
 /*
  * Option-A thumbs (HDP-defs.h:74-82): the left hand is identical to Colemak, and
  * only R on the inner right (Promethium's signature) and Enter on the outer right
  * differ. Del is not on a thumb here — it comes from Shift+Backspace.
+ *
+ * R uses lt_R rather than lt_t so that it, too, gets CommaMagic.
  */
 //                  LH2              LH1                LH0
 #define HDP_LH      &lt_t l_med ESC  &lt_t l_nav SPACE  &lt_t l_mos TAB
 //                  RH0              RH1                RH2
-#define HDP_RH      &lt_t l_sym R    &lt_bspc l_num 0   &lt_t l_fun RET
+#define HDP_RH      &lt_R l_sym R    &lt_bspc l_num 0   &lt_t l_fun RET
 
 // the two keys the Totem gains over the Corne
 #define HDP_LB5     &sk LSHFT
