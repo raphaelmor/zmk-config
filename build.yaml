@@ -18,44 +18,65 @@
 #     artifact-name: corne_left_with_studio
 #
 ---
-# The two daily-driver builds, plus diagnostics for the Bluetooth bring-up.
+# The two daily-driver builds, plus a settings_reset build and two logging builds.
 #
-# Delete the "BLUETOOTH DIAGNOSTICS" block once pairing is reliable. Logging keeps
-# USB awake and costs battery, so it does not belong in a firmware you actually use.
+# The logging builds cost CI time and nothing else — they are separate artifacts, so
+# the daily-driver firmware stays clean. Keep them; this board has no other
+# diagnostic channel.
 include:
   - board: seeeduino_xiao_ble
     shield: totem_left
   - board: seeeduino_xiao_ble
     shield: totem_right
 
-  # ---- BLUETOOTH DIAGNOSTICS (temporary) ------------------------------------
+  # ---- RECOVERY -------------------------------------------------------------
   #
-  # settings_reset wipes the settings partition — Bluetooth bonds and the saved
-  # USB/BLE endpoint preference — on every boot. ZMK ships the shield; this repo
-  # never built it, so there was no known-correct one for this board.
+  # settings_reset wipes the settings partition — Bluetooth bonds, both to the host
+  # and between the halves, plus the saved USB/BLE endpoint preference. ZMK ships
+  # the shield; this repo did not build it until pairing broke and there was no
+  # known-correct one for this board.
   #
-  # Procedure, and the order matters: flash it to a half, WAIT for it to boot and
-  # finish the wipe (a few seconds — double-tapping straight back into the
-  # bootloader can cut the wipe short), then flash the real firmware. Do both
-  # halves, because a half-reset pair leaves the central authenticating against a
-  # peripheral it can no longer talk to.
+  # THIS IS NOT OPTIONAL READING. A wipe that does not complete is silent, and it
+  # looks exactly like a hardware fault: the Mac shows TOTEM under Nearby, Connect
+  # spins, and the log says CBATTErrorInsufficientEncryption on the Report Map
+  # characteristic. That is the keyboard refusing to bond because the profile is
+  # still occupied. The right half also stops sending keys, because the split bond
+  # is stale on one side only.
   #
-  # Its own conf sets CONFIG_ZMK_BLE=n, so it cannot advertise and cannot re-pair
-  # while it is running. That is deliberate.
+  # PROCEDURE, per half, and the wait is the part that matters:
+  #   1. Double-tap reset. Drag the settings_reset uf2.
+  #   2. WAIT ~10 seconds. It boots and wipes. Do not double-tap during this.
+  #   3. Confirm it actually ran: plug that half in over USB and check for a device
+  #      named "SETTINGS RESET" —
+  #        system_profiler SPUSBDataType | grep -A4 -i "settings reset"
+  #      The shield sets ZMK_KEYBOARD_NAME to that, and Kconfig:13-14 feeds
+  #      ZMK_KEYBOARD_NAME into USB_DEVICE_PRODUCT. It uses a mock kscan, so it
+  #      enumerates but types nothing. If the name is absent, the wipe did not run.
+  #   4. Double-tap reset. Drag the real uf2 for that half.
+  # Do BOTH halves. A half-reset pair leaves one side authenticating against a bond
+  # the other no longer has.
+  #
+  # Then: both halves off, Bluetooth off on the host, right half on, wait 5s, left
+  # half on, wait 5s, Bluetooth on, pair. No USB attached to either half while
+  # pairing — after a wipe there is no saved endpoint preference, and
+  # src/endpoints.c:30-31 defaults it to USB, so an attached cable routes HID away
+  # from the BLE link you are trying to establish.
   - board: seeeduino_xiao_ble
     shield: settings_reset
     artifact-name: settings_reset
 
-  # Logging builds. The zmk-usb-logging snippet is the only way to get USB serial
-  # logging in v0.3 — see config/totem.conf for why setting CONFIG_ZMK_USB_LOGGING
-  # alone cannot work. CONFIG_ZMK_LOG_LEVEL_DBG raises the level enough to see BLE
-  # connection, bonding and endpoint-selection events.
+  # ---- LOGGING --------------------------------------------------------------
+  #
+  # The zmk-usb-logging snippet is the only way to get USB serial logging in v0.3 —
+  # see config/totem.conf for why CONFIG_ZMK_USB_LOGGING alone cannot work.
+  # CONFIG_ZMK_LOG_LEVEL_DBG raises the level enough to see BLE connection, bonding
+  # and endpoint-selection events.
   #
   # Read it with:
   #   ls /dev/tty.usbmodem*   then   screen /dev/tty.usbmodemXXXX 115200
   #   quit screen with  Ctrl-A  then  K  then  Y
   #
-  # What to look for on the LEFT half:
+  # On the LEFT half, look for:
   #   "Selected endpoint transport 0"   -> USB won; BLE will look connected but dead
   #   "Only BLE is ready"               -> what you want when on battery
   #   peer/bond/security failures       -> a stale bond survived the reset
