@@ -10,5 +10,9 @@ manifest:
     - name: zmk
       remote: zmkfirmware
       import: app/west.yml
+    - name: zmk-keyboard-totem
+      url: https://github.com/raphaelmor/zmk-keyboard-totem
+      revision: main
+      path: modules/zmk-keyboard-totem
   self:
     path: config
