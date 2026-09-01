@@ -12,7 +12,9 @@ manifest:
       import: app/west.yml
     - name: zmk-keyboard-totem
       url: https://github.com/raphaelmor/zmk-keyboard-totem
-      revision: main
+      # Pinned, not floating on main: this is your own fork, so an unrelated push
+      # to it would silently change what CI builds here.
+      revision: 579eb46
       path: modules/zmk-keyboard-totem
   self:
     path: config

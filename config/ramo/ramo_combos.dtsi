@@ -1,0 +1,131 @@
+/*
+ * ramo_combos.dtsi
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Included from inside the combos { } block in totem.keymap.
+ *
+ * Ported from users/raphaelmor/ramo_combos.c. Every position below is already at
+ * moutis' canonical Promethium location (HDPM-parity.md:17-20), so his own ZMK
+ * combo file cross-checks this one position for position.
+ *
+ * KEY POSITIONS ARE NAMED, NOT NUMBERED. The names come from keynames_totem.h and
+ * are the same ones the QMK keymap uses, which is what makes this a transcription
+ * rather than a re-derivation.
+ *
+ * HOW GATING WORKS HERE
+ *   ZMK combos do not test layer-set membership. app/src/combo.c:164 takes
+ *   zmk_keymap_highest_layer_active() and then tests combo->layer_mask & BIT(layer)
+ *   (:150-156). So `layers = <l_hdp>` fires only while Hands Down is the topmost
+ *   active layer, and &to l_cmk silences it. Three consequences:
+ *
+ *   - The predicate is checked only on the FIRST keypress of a chord, so a chord
+ *     started on one base completes even if the base changes mid-chord.
+ *   - The highest active layer includes momentary layers, so a gated combo does
+ *     not fire while NAV/SYM/NUM is held. QMK gated on default_layer_state alone
+ *     and did fire. Harmless: every gated combo is an alpha-position chord.
+ *   - An omitted `layers` property means ALL layers (:151-153), so nothing here is
+ *     left bare — even the both-bases combos name their layers.
+ *
+ * timeout-ms is my_combo_term (50), QMK's COMBO_TERM. moutis uses 45.
+ *
+ * slow-release is deliberately not used. Without it the combo releases when the
+ * first chord key lifts, which keeps the output a crisp tap rather than something
+ * that can auto-repeat while you unroll your fingers. It does not affect the qu
+ * hold-tap: holding both keys past my_linger_term still resolves as a hold.
+ */
+
+#define COMBO_ON(NAME, BINDINGS, KEYPOS, LAYERS) \
+    combo_##NAME { \
+        bindings = <BINDINGS>; \
+        key-positions = <KEYPOS>; \
+        layers = <LAYERS>; \
+        timeout-ms = <my_combo_term>; \
+    };
+
+/*
+ * OFF-MAP LETTERS — needed to type Q and Z at all on Hands Down.
+ *
+ * INTENTIONAL FIX vs QMK: ramo_combos.c:81-87 gates only ACUT..CAPW, leaving qu
+ * and z ungated. On Colemak those positions hold W+P and R+T, so rolling either
+ * emitted "qu" or "z" on a base that has real Q and Z keys. Both are gated to
+ * l_hdp here.
+ *
+ * qu is bound to a hold-tap: tap gives "qu", hold gives a bare Q. QMK typed "qu"
+ * then backspaced the u (ramo_combos.c:154-166); this never types it.
+ */
+COMBO_ON(qu,    &lk_qu Q 0,      LT3 LT1,     l_hdp)          // W+M -> qu   (hold: Q)
+COMBO_ON(z,     &kp Z,           LM3 LM1,     l_hdp)          // N+H -> z
+
+/*
+ * H-DIGRAPH — the one combo shared by both bases.
+ *
+ * QMK defined this twice, HD_Th_combo and CMK_Th_combo (ramo_combos.c:3-7), but
+ * HD_Th_keys and CMK_Th_keys are the same two positions and both emit "th", so
+ * they merge. See ramo_macros.dtsi for how &th_morph reproduces QMK's plain /
+ * shifted / Caps Word behaviour.
+ */
+COMBO_ON(th,    &th_morph,       LM2 LM1,     l_cmk l_hdp)    // T+H -> th (S+T on Colemak)
+
+/*
+ * DEAD-KEY DIACRITICS — Hands Down only, stock US Mac layout (⌥ dead keys).
+ *
+ * Tap the combo for the dead key, then type the letter. Deliberately NOT ported
+ * as Unicode: QMK-feature-audit.md:277-279 records ⌥ dead keys as the design
+ * choice, and OS Detection would be the companion if a non-Mac host ever appears.
+ *
+ * NOTE: moutis' ZMK config uses different ⌥ codes for some of these because he
+ * runs the Mac "ABC – Extended" input source. These are the stock "U.S." codes,
+ * matching ramo_combos.c:13-18.
+ */
+COMBO_ON(acut,  &kp LA(E),       RM1 RM2,     l_hdp)          // A+E -> ´  (é)
+COMBO_ON(grv,   &kp LA(GRAVE),   RM2 RM3,     l_hdp)          // E+I -> `  (è)
+COMBO_ON(circ,  &kp LA(I),       RM1 RM3,     l_hdp)          // A+I -> ˆ  (ê)
+COMBO_ON(umla,  &kp LA(U),       RB1 RB2,     l_hdp)          // U+O -> ¨  (ü)
+COMBO_ON(tilde, &kp LA(N),       LT4 LT0,     l_hdp)          // V+J -> ˜  (ñ)
+COMBO_ON(cedil, &kp LA(C),       LM4 LM2,     l_hdp)          // S+T -> ç
+
+// LIGATURES — Hands Down only
+COMBO_ON(oe,    &kp LA(Q),       RM2 RB2,     l_hdp)          // E+O -> œ
+COMBO_ON(ae,    &kp LA(SQT),     RM1 RB1,     l_hdp)          // A+U -> æ
+
+/*
+ * WHITESPACE AND EDITING — Hands Down only.
+ *
+ * Tab and Enter are on thumbs, so only these two are chords. The 3-key Shift-Tab
+ * has to land inside the same 50 ms window as the 2-key combos; QMK had the same
+ * constraint. Widen my_combo_term if it proves hard to hit.
+ */
+COMBO_ON(stab,  &kp LS(TAB),     LT4 LT3 LT2, l_hdp)          // V+W+G -> Shift-Tab
+COMBO_ON(app,   &kp K_APP,       LT1 LT0,     l_hdp)          // M+J   -> App menu
+
+/*
+ * SYMBOLS — the canonical top-right punctuation cluster (# . / " ').
+ * Hands Down only.
+ */
+COMBO_ON(scln,  &kp SEMI,        RM0 RM1,     l_hdp)          // ,+A -> ;
+COMBO_ON(coln,  &kp COLON,       RT1 RT3,     l_hdp)          // .+" -> :
+COMBO_ON(exlm,  &kp EXCL,        RT1 RT2,     l_hdp)          // .+/ -> !
+COMBO_ON(ques,  &kp QMARK,       RT2 RT3,     l_hdp)          // /+" -> ?
+
+/*
+ * CAPS WORD — moutis' canonical position.
+ *
+ * These are the same two keys as the YB -> IB adaptive that arrives in Stage 2.
+ * That is not a conflict: a simultaneous press is resolved as a combo before the
+ * adaptive engine ever sees it, and a sequential roll is the adaptive. QMK relied
+ * on exactly the same ordering (ramo_combos.c:30-33).
+ */
+COMBO_ON(capw,  &caps_word,      RB3 RB4,     l_hdp)          // Y+B -> Caps Word
+
+/*
+ * BASE RECOVERY — new, no QMK counterpart.
+ *
+ * ZMK cannot boot into a non-zero layer: the default layer is permanently 0 and
+ * layer state does not survive a reboot or deep-sleep wake. So the board comes up
+ * in Colemak, and this puts Hands Down one deliberate two-pinky chord away rather
+ * than requiring the NAV double-tap.
+ *
+ * Gated to l_cmk, so it is inert once Hands Down is already up.
+ */
+COMBO_ON(tohdp, &to l_hdp,       LB5 RB5,     l_cmk)          // both outer pinkies -> HDP

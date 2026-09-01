@@ -1,96 +1,100 @@
 /*
- * TOTEM matrix validation keymap.
+ * totem.keymap — Colemak + Hands Down Promethium on a TOTEM
  *
- * PURPOSE: prove that every one of the 38 switches works, and that each one
- * maps to the position you expect. Every key sends a different character.
- * There are no home-row mods and no combos, so nothing can mask a dead key.
+ * SPDX-License-Identifier: MIT
  *
- * HOW TO TEST
- *   Step 1 - LEFT half alone, over USB. Open a text editor. Press every
- *   left-half key, left to right, top row downward. Expect exactly:
- *          1 2 3 4 5    Q W E R T    A S D F G H    Z X C
- *   This proves the left matrix, the transform and USB HID all work.
+ * Ported from the QMK userspace at ~/code/perso/keyboard/qmk_userspace
+ * (users/raphaelmor), which remains the spec source of truth: TouchTutor parses
+ * those C files, and `tt verify` needs the QMK HID console that ZMK has no
+ * equivalent of. Keep the two in sync by hand, and prefer matching the QMK
+ * behaviour over adopting a nicer ZMK idiom.
  *
- *   Step 2 - RIGHT half alone, over USB. It will type NOTHING. That is
- *   correct and not a fault: the right half is the split peripheral, and ZMK
- *   compiles the HID stack only for the central (app/CMakeLists.txt:47). Read
- *   its serial log instead, see totem.conf. Press each right-half key and
- *   watch for one "Sending event at r,c" line per press. 19 keys, 19 lines.
+ * STRUCTURE (mirrors moutis' own ZMK config, config/corneish_zen.keymap)
+ *   keynames_totem.h        38 key position names, shared with QMK and moutis
+ *   ramo/ramo_config.dtsi   layer indices, timings, stock-behaviour overrides
+ *   layouts/hdp-config.h    the Hands Down Promethium base
+ *   layouts/cmk-config.h    the Colemak base
+ *   layouts/layers_def.h    the six non-alpha layers
+ *   ramo/ramo_behaviors.dtsi hold-taps, mod-morphs, linger keys, tap dances
+ *   ramo/ramo_macros.dtsi   digraph and bracket-pair macros
+ *   ramo/ramo_combos.dtsi   19 combos (18 ported from QMK, 1 for base recovery)
+ *   keymap_totem.dtsi       the 8 layer blocks
  *
- *   Step 3 - BOTH halves. Left over USB, right switched on. Press everything.
- *   Expect the whole string:
- *          1234567890 QWERTYUIOP ASDFGHJKL;'\ ZXCVBN
- *   This is the only step that proves the halves are paired and that the
- *   right half's col-offset of 5 is correct.
+ * BASE LAYERS
+ *   Colemak is layer 0 and Hands Down is layer 1, matching the QMK enum order in
+ *   ramo_layers.h. ZMK's layer 0 is special — it can never be deactivated and the
+ *   default layer is permanently 0 — so Colemak has to take it, and the board
+ *   comes up in Colemak after a reboot or a deep-sleep wake.
  *
- * READING THE RESULT
- *   one character missing   -> that switch or its solder joint is bad
- *   two keys, same output   -> a row or column pin is shorted
- *   a whole row missing     -> that row pin is the problem   (xiao_d 0..3)
- *   a whole column missing  -> that column pin is the problem (xiao_d 4,5,8,9,10)
- *   steps 1 and 2 pass, step 3 gives only left-half characters
- *                           -> the halves are not paired. Hold "\" and press
- *                              the top-left key to clear bonds, then repair.
- *   step 3 gives wrong characters from the right half only
- *                           -> col-offset or the right col-gpios order is wrong
+ *   To get to Hands Down: press both outer pinky keys together (LB5+RB5), or
+ *   double-tap the HDP key on NAV. CONFIG_ZMK_IDLE_SLEEP_TIMEOUT in totem.conf
+ *   keeps reboots infrequent.
  *
- * RECOVERY: press the XIAO reset button twice, quickly. The board mounts as a
- * USB drive. Drag a .uf2 onto it. This works whatever the firmware does.
+ * RECOVERY, carried over from the matrix validation keymap this replaced
+ *   Press the XIAO reset button twice, quickly. The board mounts as a USB drive;
+ *   drag a .uf2 onto it. This works whatever the firmware does, and is the
+ *   reliable path — &rst_btld on MED is only a convenience.
  *
- * UTILITY LAYER: hold either outer key. The left one types "A", the right one
- * types "\". Both reach the same layer, so it works with one half alone.
- *   "1" key  -> bootloader
- *   "2" key  -> reset
- *   "Q" key  -> clear Bluetooth bonds
- *   "W" key  -> toggle USB / Bluetooth output
- * Every other key on that layer does nothing, so an accidental hold is safe.
+ *   If nothing types at all over USB, suspect the output endpoint before the
+ *   matrix: ZMK stores the USB-or-Bluetooth choice in the settings partition and a
+ *   .uf2 update does not erase it. Hold the left Esc thumb for MED, then press the
+ *   outer top-right key to force USB, or the key left of it to clear stale
+ *   Bluetooth bonds. Both work locally without working HID output.
  *
- * IF NOTHING TYPES AT ALL over USB, suspect the output endpoint before the
- * matrix. ZMK saves the USB-or-Bluetooth choice in the settings partition, and
- * a .uf2 update does not erase it. Hold an outer key and press "W" to force
- * USB, or press "Q" to drop the stale bonds. Both work locally and do not need
- * HID output to be functioning.
+ *   The full 38-switch validation keymap, with its per-symptom diagnosis table, is
+ *   in git history at commit ce1d533 if a matrix fault ever needs chasing again.
  */
 
 #include <behaviors.dtsi>
 #include <dt-bindings/zmk/keys.h>
+#include <dt-bindings/zmk/modifiers.h>
 #include <dt-bindings/zmk/bt.h>
 #include <dt-bindings/zmk/outputs.h>
 
-#define TEST 0
-#define UTIL 1
+/*
+ * Mouse speed, ported from QMK's MOUSEKEY_MAX_SPEED 6 at MOUSEKEY_INTERVAL 16
+ * (users/raphaelmor/config.h:17-26): 6 units per 16 ms is 375 units per second,
+ * and ZMK counts per second. The rest of the tuning is on &mmv in ramo_config.dtsi.
+ *
+ * These MUST come before the include — pointing.h guards both with #ifndef, so a
+ * define afterwards is silently ignored. Nothing in behaviors.dtsi pulls pointing.h
+ * in first, which is what makes this ordering work.
+ */
+#define ZMK_POINTING_DEFAULT_MOVE_VAL 375
+#define ZMK_POINTING_DEFAULT_SCRL_VAL 10
+#include <dt-bindings/zmk/pointing.h>
+
+#include "keynames_totem.h"
+#include "ramo/ramo_config.dtsi"
+
+#include "layouts/hdp-config.h"
+#include "layouts/cmk-config.h"
+#include "layouts/layers_def.h"
 
 / {
-    keymap {
-        compatible = "zmk,keymap";
+/*
+ * Behaviors. Forward references to the macros below are fine: devicetree resolves
+ * phandles after the whole tree is parsed.
+ */
+    behaviors {
 
-        test_layer {
-            display-name = "TEST";
-//       ┌─────┬─────┬─────┬─────┬─────┐             ┌─────┬─────┬─────┬─────┬─────┐
-//       │  1  │  2  │  3  │  4  │  5  │             │  6  │  7  │  8  │  9  │  0  │
-//       ├─────┼─────┼─────┼─────┼─────┤             ├─────┼─────┼─────┼─────┼─────┤
-//       │  Q  │  W  │  E  │  R  │  T  │             │  Y  │  U  │  I  │  O  │  P  │
-// ┌─────┼─────┼─────┼─────┼─────┼─────┤             ├─────┼─────┼─────┼─────┼─────┼─────┐
-// │  A  │  S  │  D  │  F  │  G  │  H  │             │  J  │  K  │  L  │  ;  │  '  │  \  │
-// └─────┴─────┴─────┼─────┼─────┼─────┤             ├─────┼─────┼─────┼─────┴─────┴─────┘
-//                   │  Z  │  X  │  C  │             │  V  │  B  │  N  │
-//                   └─────┴─────┴─────┘             └─────┴─────┴─────┘
-            bindings = <
-        &kp N1   &kp N2   &kp N3   &kp N4   &kp N5      &kp N6   &kp N7   &kp N8   &kp N9   &kp N0
-        &kp Q    &kp W    &kp E    &kp R    &kp T       &kp Y    &kp U    &kp I    &kp O    &kp P
-&lt UTIL A   &kp S    &kp D    &kp F    &kp G    &kp H       &kp J    &kp K    &kp L    &kp SEMI &kp SQT  &lt UTIL BSLH
-                          &kp Z    &kp X    &kp C       &kp V    &kp B    &kp N
-            >;
-        };
+#include "ramo/ramo_behaviors.dtsi"
 
-        util_layer {
-            display-name = "UTIL";
-            bindings = <
-        &bootloader  &sys_reset    &none  &none  &none      &none  &none  &none  &none  &none
-        &bt BT_CLR   &out OUT_TOG  &none  &none  &none      &none  &none  &none  &none  &none
-&trans  &none        &none         &none  &none  &none      &none  &none  &none  &none  &none  &trans
-                                   &none  &none  &none      &none  &none  &none
-            >;
-        };
     };
+
+    macros {
+
+#include "ramo/ramo_macros.dtsi"
+
+    };
+
+    combos {
+        compatible = "zmk,combos";
+
+#include "ramo/ramo_combos.dtsi"
+
+    };
+
+#include "keymap_totem.dtsi"
+
 };

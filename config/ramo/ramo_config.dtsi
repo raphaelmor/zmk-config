@@ -1,0 +1,140 @@
+/*
+ * ramo_config.dtsi
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Layer indices, timing constants, and overrides of ZMK's stock behaviors.
+ * Included from totem.keymap after behaviors.dtsi, so the & overrides at the
+ * bottom have something to override.
+ *
+ * Every timing here is traceable to the QMK userspace it came from
+ * (users/raphaelmor/config.h). Where ZMK's model differs from QMK's, the
+ * difference is written down rather than silently absorbed.
+ */
+
+/*
+ * LAYERS
+ *
+ * Same order and same indices as the QMK enum (users/raphaelmor/ramo_layers.h),
+ * so a layer number means the same thing in both firmwares.
+ *
+ * l_cmk is 0 because ZMK's layer 0 is special: it can never be deactivated
+ * (app/src/keymap.c:145) and the default layer is permanently 0 with no setter
+ * anywhere in v0.3 (:27). Colemak therefore takes it, and &to l_hdp raises
+ * Hands Down on top.
+ *
+ * Layer state does not survive a reboot or a deep-sleep wake, so the board comes
+ * up in Colemak. CONFIG_ZMK_IDLE_SLEEP_TIMEOUT in totem.conf makes that rare,
+ * and the LB5+RB5 combo in ramo_combos.dtsi makes recovery one motion.
+ */
+#define l_cmk 0     // COLEMAK    (QMK L_COLEMAK)
+#define l_hdp 1     // HANDSDOWN  (QMK L_HANDSDOWN)
+#define l_med 2     // MEDIA      (QMK L_MEDIA)
+#define l_nav 3     // NAV        (QMK L_NAV)
+#define l_mos 4     // MOUSE      (QMK L_MOUSE)
+#define l_sym 5     // SYM        (QMK L_SYM)
+#define l_num 6     // NUM        (QMK L_NUM)
+#define l_fun 7     // FUN        (QMK L_FUN)
+
+/*
+ * TIMINGS
+ */
+
+// QMK TAPPING_TERM (config.h:5). Applies to every hold-tap here.
+#define my_tapping_term 200
+
+// QMK COMBO_TERM was the QMK default of 50. moutis uses 45 in ZMK. Keeping 50
+// so the two firmwares feel the same while the layout is still being learned.
+#define my_combo_term 50
+
+// QMK RAMO_COMBO_HOLD and RAMO_LINGER_TERM, both TAPPING_TERM (config.h:32-33).
+// This is the hold threshold on the linger keys and on the qu combo.
+#define my_linger_term 200
+
+// QMK TAP_CODE_DELAY 20 (config.h:14) — at 0, back-to-back taps inside a macro
+// can land in the same USB frame and go missing or out of order.
+#define my_tap_ms 20
+
+// Sticky shift on LB5. No QMK counterpart; QMK had no sticky mods at all.
+#define my_sticky_term 1000
+
+/*
+ * Stage 2 (adaptive keys) — defined here so the whole timing story lives in one
+ * place, unused until layouts/hdp-adapt.dtsi exists.
+ *
+ * QMK RAMO_ADAPTIVE_TERM 175, tuned empirically 50 -> 100 -> 175 (config.h:35-49).
+ * The reasoning was that adaptives fix SFBs and scissors, which are slow motions
+ * by definition, so a window tuned to roll speed systematically misses the
+ * highest-value rules. ZMK's max-prior-idle-ms is not measured the same way as
+ * QMK's keydown-to-keydown event.time window, so treat 175 as a starting point
+ * and re-tune. moutis runs 350 in ZMK.
+ */
+#define my_ak_term 175
+
+// QMK RAMO_ADAPT_SHIFT_TERM, TAPPING_TERM (config.h:52). moutis runs ak_term * 4.
+#define my_cc_term 200
+
+/*
+ * MODIFIER COMBINATIONS
+ *
+ * ZMK has no HYPR_T/MEH_T shorthand. A modifier function applied to a modifier
+ * keycode holds all of them, which is the documented idiom.
+ */
+#define HYPER LC(LS(LA(LGUI)))      // QMK KC_HYPR
+#define MEH   LC(LS(LALT))          // QMK KC_MEH
+
+/*
+ * OVERRIDES OF STOCK ZMK BEHAVIORS
+ */
+
+/*
+ * Caps Word. Replaces QMK's caps_word_press_user hook (ramo_linger.c:45-59).
+ *
+ * ZMK enhances alphas automatically and treats numerics and modifiers as
+ * non-breaking, so continue-list only needs the four remaining keys QMK listed.
+ * mods is LSFT to match QMK's add_weak_mods(MOD_BIT(KC_LSFT)); moutis sends both
+ * shifts, which is not needed.
+ *
+ * NOT PORTED: QMK's space -> "_" substitution (ramo_linger.c:80-97). It needs to
+ * read Caps Word state from inside a keypress handler and ZMK exposes no such
+ * hook. Stage 3 puts "_" on a combo instead, which is moutis' own answer.
+ */
+&caps_word {
+    mods = <(MOD_LSFT)>;
+    continue-list = <UNDER MINUS BSPC DEL>;
+};
+
+// Sticky shift, on LB5 — one of the two keys the Totem gains over the Corne.
+// Left on stock behaviour otherwise: quick-release would drop the shift on the
+// next key press rather than its release, which is a subtler change than it
+// looks and there is no QMK counterpart to compare against.
+&sk {
+    release-after-ms = <my_sticky_term>;
+};
+
+/*
+ * Mouse movement, ported from QMK's tuning (config.h:17-26).
+ *
+ * The units differ: QMK counts units per interval, ZMK counts per second, and
+ * QMK's MOUSEKEY_TIME_TO_MAX is a count of intervals rather than milliseconds.
+ *
+ *   MOUSEKEY_MAX_SPEED    6  x 1000/16 ms  ->  375 counts/s (ZMK_POINTING_DEFAULT_MOVE_VAL)
+ *   MOUSEKEY_TIME_TO_MAX 64  x 16 ms       ->  1024 ms
+ *   MOUSEKEY_INTERVAL    16                ->  16 ms
+ *   MOUSEKEY_DELAY        0                ->  0 ms
+ *
+ * acceleration-exponent 1 is uniform acceleration, which is the closest match to
+ * QMK's linear ramp. MOVE_VAL itself is set in totem.keymap, because it has to
+ * be defined before dt-bindings/zmk/pointing.h is included.
+ */
+&mmv {
+    trigger-period-ms = <16>;
+    delay-ms = <0>;
+    time-to-max-speed-ms = <1024>;
+    acceleration-exponent = <1>;
+};
+
+// QMK MOUSEKEY_WHEEL_DELAY 0. Scroll speed keeps the ZMK default of 10/s.
+&msc {
+    delay-ms = <0>;
+};

@@ -1,0 +1,224 @@
+/*
+ * ramo_behaviors.dtsi
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Included from inside the behaviors { } block in totem.keymap.
+ *
+ * Structure follows moutis' ZMK config (config/moutis/moutis_behaviors.dtsi):
+ * one shared property block per class of hold-tap, then the instances.
+ *
+ * Naming: hm = home-row mod, lt = layer tap, lk = linger key, mm = mod-morph,
+ * td = tap dance.
+ */
+
+/*
+ * SHARED HOLD-TAP CONFIGURATION
+ *
+ * flavor "balanced" is a deliberate change from QMK, which ran with both
+ * PERMISSIVE_HOLD and HOLD_ON_OTHER_KEY_PRESS off — i.e. closest to
+ * "tap-preferred". QMK-feature-audit.md:149-150 argues for pairing positional
+ * hold with permissive-hold semantics, and "balanced" is that pairing. It is
+ * also what moutis ships.
+ *
+ * quick-tap-ms is deliberately NOT set. QMK ran QUICK_TAP_TERM 0 (config.h:8,
+ * "disables double tap hold auto-repeat") and ZMK's default of -1 is the same
+ * thing, so leaving it out is the faithful port. moutis uses 55.
+ *
+ * require-prior-idle-ms is also NOT set. It is ZMK's Flow Tap, listed as T2 in
+ * QMK-feature-audit.md:208-221. Reach for it (150 is urob's value) only if
+ * CROSS-hand misfires show up in practice — same-hand ones are already handled
+ * below. Setting it here rather than globally is what makes it safe: the thumb
+ * layer-taps stay untouched, which the audit called a mandatory override.
+ */
+#define my_hrm_config \
+    compatible = "zmk,behavior-hold-tap"; \
+    #binding-cells = <2>; \
+    flavor = "balanced"; \
+    hold-trigger-on-release; \
+    tapping-term-ms = <my_tapping_term>
+
+/*
+ * Thumb layer-taps. "tap-preferred" keeps a thumb from stealing a layer when it
+ * is rolled into, which matters because every layer here puts its modifier block
+ * on the same hand as its own activating thumb.
+ *
+ * No hold-trigger-key-positions on purpose. That is what fixes the problem
+ * QMK-feature-audit.md:124-144 describes: with a global CHORDAL_HOLD, chording a
+ * thumb with its own hand's mods inside the tapping term would settle the
+ * layer-tap as a tap and type Esc/Space/Tab/r/Backspace/Enter instead. In ZMK the
+ * positional restriction is per behavior, so omitting it here costs nothing and
+ * no 46-key handedness table is needed.
+ */
+#define my_lt_config \
+    compatible = "zmk,behavior-hold-tap"; \
+    #binding-cells = <2>; \
+    flavor = "tap-preferred"; \
+    tapping-term-ms = <my_tapping_term>
+
+/*
+ * Linger keys. Tap for the plain glyph, hold past my_linger_term for the pair.
+ * Replaces the hand-rolled timer in ramo_linger.c:10-38.
+ */
+#define my_lk_config \
+    compatible = "zmk,behavior-hold-tap"; \
+    #binding-cells = <2>; \
+    flavor = "tap-preferred"; \
+    tapping-term-ms = <my_linger_term>
+
+/*
+ * HOME ROW MODS
+ *
+ * hold-trigger-key-positions is ZMK's native equivalent of QMK's CHORDAL_HOLD,
+ * which QMK-feature-audit.md:92-101 names as the single biggest gap in the QMK
+ * build: 16 mod-taps at TAPPING_TERM 200 with no misfire protection at all.
+ * A left-hand mod only takes its hold if the next key is on the right hand or a
+ * thumb, so same-hand rolls — exactly the motions Hands Down is built around —
+ * settle as taps.
+ *
+ * THUMBS is in both lists so cross-hand and same-hand thumb chords both keep
+ * working (Shift+Space, layer-thumb plus its own hand's mods).
+ *
+ * hold-trigger-on-release defers the positional decision to the release of the
+ * interrupting key, which makes cross-hand chords more forgiving.
+ *
+ * Used as: &hml LCTRL S   (param1 = the modifier, param2 = the tapped keycode)
+ */
+    hml: homerow_mods_left {
+        my_hrm_config;
+        bindings = <&kp>, <&kp>;
+        hold-trigger-key-positions = <KEYS_R THUMBS>;
+    };
+    hmr: homerow_mods_right {
+        my_hrm_config;
+        bindings = <&kp>, <&kp>;
+        hold-trigger-key-positions = <KEYS_L THUMBS>;
+    };
+
+/*
+ * THUMB LAYER TAPS
+ *
+ * One generic instance covers five of the six thumbs on both bases, because the
+ * layer and the keycode are both parameters:
+ *
+ *   HDP  &lt_t l_med ESC   &lt_t l_nav SPACE   &lt_t l_mos TAB
+ *        &lt_t l_sym R                         &lt_t l_fun RET
+ *   CMK  &lt_t l_med ESC   &lt_t l_nav SPACE   &lt_t l_mos TAB
+ *        &lt_t l_sym RET                       &lt_t l_fun DEL
+ */
+    lt_t: layer_tap_thumb {
+        my_lt_config;
+        bindings = <&mo>, <&kp>;
+    };
+
+/*
+ * The NUM thumb is the exception: its tap is a mod-morph, not a plain keycode.
+ * Used as &lt_bspc l_num 0 — the second parameter is ignored by mm_BspcDel and
+ * must be 0, since a 0-binding-cell behavior silently drops it.
+ */
+    lt_bspc: layer_tap_bspc {
+        my_lt_config;
+        bindings = <&mo>, <&mm_BspcDel>;
+    };
+
+/*
+ * Shift+Backspace -> Delete. Replaces ramo_process_record.c:35-42 and its manual
+ * clear_mods()/set_mods() dance. This is what keeps Del reachable on the Hands
+ * Down base, where the Option-A thumbs moved it off the thumb cluster.
+ *
+ * KNOWN DIVERGENCE: QMK fired only with shift and nothing else
+ * (!(get_mods() & ~MOD_MASK_SHIFT)), so Cmd+Shift+Bspc stayed Backspace. ZMK's
+ * mod-morph tests whether the held mods CONTAIN cfg->mods, not whether they match
+ * exactly, and there is no exclusive-mods property. So Cmd+Shift+Bspc and
+ * Alt+Shift+Bspc now give Delete. Neither is a standard macOS shortcut.
+ */
+    mm_BspcDel: mm_BspcDel {
+        compatible = "zmk,behavior-mod-morph";
+        #binding-cells = <0>;
+        bindings = <&kp BSPC>, <&kp DEL>;
+        mods = <(MOD_LSFT|MOD_RSFT)>;
+    };
+
+/*
+ * DIGRAPH MOD-MORPHS
+ *
+ * See the comment block in ramo_macros.dtsi for why a mod-morph reproduces all
+ * three of QMK's cases (plain / shifted / Caps Word) with no state inspection.
+ */
+    th_morph: th_morph {
+        compatible = "zmk,behavior-mod-morph";
+        #binding-cells = <0>;
+        bindings = <&t_Th>, <&t_ThCap>;
+        mods = <(MOD_LSFT|MOD_RSFT)>;
+    };
+    qu_morph: qu_morph {
+        compatible = "zmk,behavior-mod-morph";
+        #binding-cells = <0>;
+        bindings = <&t_Qu>, <&t_QuCap>;
+        mods = <(MOD_LSFT|MOD_RSFT)>;
+    };
+
+/*
+ * LINGER KEYS
+ *
+ * Bracket pairs. Tap for the open bracket, hold for the pair with the caret
+ * between. Used as &lk_par 0 LPAR — param1 goes to the 0-cell macro on the hold
+ * side and must be 0; param2 is the tapped glyph.
+ */
+    lk_par: lk_par {
+        my_lk_config;
+        bindings = <&t_pairPar>, <&kp>;
+    };
+    lk_brc: lk_brc {
+        my_lk_config;
+        bindings = <&t_pairBrc>, <&kp>;
+    };
+
+/*
+ * The qu combo, bound to a hold-tap so the chord has two outcomes. Tap types
+ * "qu", hold types a bare Q.
+ *
+ * This is strictly better than the QMK version (ramo_combos.c:127-166), which
+ * typed "qu" and then backspaced the u once the hold threshold passed. Here the
+ * u is never typed. Used as &lk_qu Q 0.
+ *
+ * Note the tapping term is measured from the FIRST key of the chord, not from
+ * chord completion (app/src/combo.c:347).
+ */
+    lk_qu: lk_qu {
+        my_lk_config;
+        bindings = <&kp>, <&qu_morph>;
+    };
+
+/*
+ * BASE LAYER SWITCHES
+ *
+ * Double-tap to switch, matching QMK's tap dances (ramo_tap_dance.c:1-15, which
+ * act only on state->count == 2). A single tap does nothing, so a stray press on
+ * NAV cannot silently change your base layer.
+ */
+    td_cmk: td_cmk {
+        compatible = "zmk,behavior-tap-dance";
+        #binding-cells = <0>;
+        tapping-term-ms = <my_tapping_term>;
+        bindings = <&none>, <&to l_cmk>;
+    };
+    td_hdp: td_hdp {
+        compatible = "zmk,behavior-tap-dance";
+        #binding-cells = <0>;
+        tapping-term-ms = <my_tapping_term>;
+        bindings = <&none>, <&to l_hdp>;
+    };
+
+/*
+ * Reset and bootloader on one key: tap for reset, hold for bootloader.
+ * QMK-feature-audit.md:250-252 notes neither exists on any layer in the QMK
+ * build. Lives on MED, used as &rst_btld 0 0.
+ */
+    rst_btld: rst_btld {
+        compatible = "zmk,behavior-hold-tap";
+        #binding-cells = <2>;
+        flavor = "tap-preferred";
+        tapping-term-ms = <500>;
+        bindings = <&bootloader>, <&sys_reset>;
+    };

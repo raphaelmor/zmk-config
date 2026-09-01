@@ -1,0 +1,79 @@
+/*
+ * ramo_macros.dtsi
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Included from inside the macros { } block in totem.keymap — ZMK's ZMK_MACRO
+ * emits a bare node, so it needs a parent.
+ *
+ * Naming follows moutis: t_ = type text.
+ *
+ * wait-ms and tap-ms are both my_tap_ms (20), which is QMK's TAP_CODE_DELAY
+ * (config.h:14). At 0, back-to-back taps can land in the same USB frame and go
+ * missing or out of order — the same bug QMK hit in the del-then-retype
+ * adaptives.
+ */
+
+/*
+ * DIGRAPH MACROS
+ *
+ * Two variants each, wired together by a mod-morph in ramo_behaviors.dtsi, which
+ * is what reproduces QMK's three-way behaviour from ramo_combos.c:118-125:
+ *
+ *   nothing held  -> t_Th        -> "th"
+ *   shift held    -> t_ThCap     -> "Th"   (mod-morph consumes the shift, so the
+ *                                           second letter is unshifted — QMK did
+ *                                           this with unregister_mods)
+ *   Caps Word on  -> t_Th        -> "TH"   (a mod-morph cannot see Caps Word's
+ *                                           shift: it lives in implicit_modifiers
+ *                                           and mod-morph tests explicit mods
+ *                                           only, so the unshifted branch runs
+ *                                           and Caps Word enhances both alphas)
+ */
+    ZMK_MACRO(t_Th,
+        wait-ms = <my_tap_ms>;
+        tap-ms  = <my_tap_ms>;
+        bindings = <&macro_tap &kp T &kp H>;
+    )
+    ZMK_MACRO(t_ThCap,
+        wait-ms = <my_tap_ms>;
+        tap-ms  = <my_tap_ms>;
+        bindings = <&macro_tap &kp LS(T) &kp H>;
+    )
+
+/*
+ * "qu" — the combo that gives Q a home on Hands Down. Same shift handling as th.
+ * Holding the combo past my_linger_term gives a bare Q instead; that is the
+ * hold side of &lk_qu and needs no macro.
+ */
+    ZMK_MACRO(t_Qu,
+        wait-ms = <my_tap_ms>;
+        tap-ms  = <my_tap_ms>;
+        bindings = <&macro_tap &kp Q &kp U>;
+    )
+    ZMK_MACRO(t_QuCap,
+        wait-ms = <my_tap_ms>;
+        tap-ms  = <my_tap_ms>;
+        bindings = <&macro_tap &kp LS(Q) &kp U>;
+    )
+
+/*
+ * BRACKET PAIRS — the hold side of the linger keys.
+ *
+ * QMK typed the opening bracket on press and appended the closer plus Left once
+ * the hold threshold passed (ramo_linger.c:10-38), so the pair macro here has to
+ * type BOTH brackets: ZMK's hold-tap has not emitted anything yet when it decides.
+ *
+ * Visible difference from QMK: the opening bracket appears when the hold-tap
+ * resolves rather than instantly on press.
+ */
+    ZMK_MACRO(t_pairPar,
+        wait-ms = <my_tap_ms>;
+        tap-ms  = <my_tap_ms>;
+        bindings = <&macro_tap &kp LPAR &kp RPAR &kp LEFT>;
+    )
+    ZMK_MACRO(t_pairBrc,
+        wait-ms = <my_tap_ms>;
+        tap-ms  = <my_tap_ms>;
+        bindings = <&macro_tap &kp LBRC &kp RBRC &kp LEFT>;
+    )

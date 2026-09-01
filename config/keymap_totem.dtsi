@@ -1,0 +1,103 @@
+/*
+ * keymap_totem.dtsi
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Assembles all 8 layers from the row macros. Included from inside / { } in
+ * totem.keymap.
+ *
+ * NODE ORDER IS LAYER INDEX. These nodes must stay in the same order as the
+ * l_* defines in ramo/ramo_config.dtsi, which is the order of the QMK enum in
+ * users/raphaelmor/ramo_layers.h.
+ *
+ * The 38 positions, in binding order:
+ *
+ *            LT4 LT3 LT2 LT1 LT0      RT0 RT1 RT2 RT3 RT4          0-9
+ *            LM4 LM3 LM2 LM1 LM0      RM0 RM1 RM2 RM3 RM4         10-19
+ *   LB5      LB4 LB3 LB2 LB1 LB0      RB0 RB1 RB2 RB3 RB4     RB5 20-31
+ *                LH2 LH1 LH0          RH0 RH1 RH2                 32-37
+ */
+
+    keymap {
+        compatible = "zmk,keymap";
+
+        layer_cmk {
+            display-name = CMK_label;
+            bindings = <
+                        CMK_LT      CMK_RT
+                        CMK_LM      CMK_RM
+            CMK_LB5     CMK_LB      CMK_RB      CMK_RB5
+                        CMK_LH      CMK_RH
+            >;
+        };
+
+        layer_hdp {
+            display-name = HDP_label;
+            bindings = <
+                        HDP_LT      HDP_RT
+                        HDP_LM      HDP_RM
+            HDP_LB5     HDP_LB      HDP_RB      HDP_RB5
+                        HDP_LH      HDP_RH
+            >;
+        };
+
+        layer_med {
+            display-name = l_med_label;
+            bindings = <
+                        l_med_LT    l_med_RT
+                        l_med_LM    l_med_RM
+            l_med_LB5   l_med_LB    l_med_RB    l_med_RB5
+                        l_med_LH    l_med_RH
+            >;
+        };
+
+        layer_nav {
+            display-name = l_nav_label;
+            bindings = <
+                        l_nav_LT    l_nav_RT
+                        l_nav_LM    l_nav_RM
+            l_nav_LB5   l_nav_LB    l_nav_RB    l_nav_RB5
+                        l_nav_LH    l_nav_RH
+            >;
+        };
+
+        layer_mos {
+            display-name = l_mos_label;
+            bindings = <
+                        l_mos_LT    l_mos_RT
+                        l_mos_LM    l_mos_RM
+            l_mos_LB5   l_mos_LB    l_mos_RB    l_mos_RB5
+                        l_mos_LH    l_mos_RH
+            >;
+        };
+
+        layer_sym {
+            display-name = l_sym_label;
+            bindings = <
+                        l_sym_LT    l_sym_RT
+                        l_sym_LM    l_sym_RM
+            l_sym_LB5   l_sym_LB    l_sym_RB    l_sym_RB5
+                        l_sym_LH    l_sym_RH
+            >;
+        };
+
+        layer_num {
+            display-name = l_num_label;
+            bindings = <
+                        l_num_LT    l_num_RT
+                        l_num_LM    l_num_RM
+            l_num_LB5   l_num_LB    l_num_RB    l_num_RB5
+                        l_num_LH    l_num_RH
+            >;
+        };
+
+        layer_fun {
+            display-name = l_fun_label;
+            bindings = <
+                        l_fun_LT    l_fun_RT
+                        l_fun_LM    l_fun_RM
+            l_fun_LB5   l_fun_LB    l_fun_RB    l_fun_RB5
+                        l_fun_LH    l_fun_RH
+            >;
+        };
+    };

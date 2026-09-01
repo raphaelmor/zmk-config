@@ -18,14 +18,15 @@
 #     artifact-name: corne_left_with_studio
 #
 ---
-# The zmk-usb-logging snippet turns on USB serial logging. It is needed to test
-# the right half, which is the split peripheral and cannot type. Remove both
-# snippet lines once the keyboard is validated: logging keeps USB awake and
-# costs battery.
+# Both halves, no snippets.
+#
+# The zmk-usb-logging snippet was here for the matrix validation build, because the
+# right half is the split peripheral and cannot type. The matrix is validated, so
+# it is gone: logging keeps USB awake and costs battery. To bring it back for
+# debugging, add "snippet: zmk-usb-logging" to a target and read config/totem.conf
+# for how to read the log.
 include:
   - board: seeeduino_xiao_ble
     shield: totem_left
-    snippet: zmk-usb-logging
   - board: seeeduino_xiao_ble
     shield: totem_right
-    snippet: zmk-usb-logging
