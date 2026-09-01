@@ -37,12 +37,19 @@
  * RECOVERY: press the XIAO reset button twice, quickly. The board mounts as a
  * USB drive. Drag a .uf2 onto it. This works whatever the firmware does.
  *
- * UTILITY LAYER: hold the right outer key, the one that types "\".
- *   top-left key       -> bootloader
- *   key right of it    -> reset
- *   home-row 1st key   -> clear Bluetooth bonds
- *   home-row 2nd key   -> toggle USB / Bluetooth output
+ * UTILITY LAYER: hold either outer key. The left one types "A", the right one
+ * types "\". Both reach the same layer, so it works with one half alone.
+ *   "1" key  -> bootloader
+ *   "2" key  -> reset
+ *   "Q" key  -> clear Bluetooth bonds
+ *   "W" key  -> toggle USB / Bluetooth output
  * Every other key on that layer does nothing, so an accidental hold is safe.
+ *
+ * IF NOTHING TYPES AT ALL over USB, suspect the output endpoint before the
+ * matrix. ZMK saves the USB-or-Bluetooth choice in the settings partition, and
+ * a .uf2 update does not erase it. Hold an outer key and press "W" to force
+ * USB, or press "Q" to drop the stale bonds. Both work locally and do not need
+ * HID output to be functioning.
  */
 
 #include <behaviors.dtsi>
@@ -71,7 +78,7 @@
             bindings = <
         &kp N1   &kp N2   &kp N3   &kp N4   &kp N5      &kp N6   &kp N7   &kp N8   &kp N9   &kp N0
         &kp Q    &kp W    &kp E    &kp R    &kp T       &kp Y    &kp U    &kp I    &kp O    &kp P
-&kp A   &kp S    &kp D    &kp F    &kp G    &kp H       &kp J    &kp K    &kp L    &kp SEMI &kp SQT  &lt UTIL BSLH
+&lt UTIL A   &kp S    &kp D    &kp F    &kp G    &kp H       &kp J    &kp K    &kp L    &kp SEMI &kp SQT  &lt UTIL BSLH
                           &kp Z    &kp X    &kp C       &kp V    &kp B    &kp N
             >;
         };
@@ -81,7 +88,7 @@
             bindings = <
         &bootloader  &sys_reset    &none  &none  &none      &none  &none  &none  &none  &none
         &bt BT_CLR   &out OUT_TOG  &none  &none  &none      &none  &none  &none  &none  &none
-&none   &none        &none         &none  &none  &none      &none  &none  &none  &none  &none  &trans
+&trans  &none        &none         &none  &none  &none      &none  &none  &none  &none  &none  &trans
                                    &none  &none  &none      &none  &none  &none
             >;
         };
