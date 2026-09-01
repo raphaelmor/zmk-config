@@ -18,15 +18,54 @@
 #     artifact-name: corne_left_with_studio
 #
 ---
-# Both halves, no snippets.
+# The two daily-driver builds, plus diagnostics for the Bluetooth bring-up.
 #
-# The zmk-usb-logging snippet was here for the matrix validation build, because the
-# right half is the split peripheral and cannot type. The matrix is validated, so
-# it is gone: logging keeps USB awake and costs battery. To bring it back for
-# debugging, add "snippet: zmk-usb-logging" to a target and read config/totem.conf
-# for how to read the log.
+# Delete the "BLUETOOTH DIAGNOSTICS" block once pairing is reliable. Logging keeps
+# USB awake and costs battery, so it does not belong in a firmware you actually use.
 include:
   - board: seeeduino_xiao_ble
     shield: totem_left
   - board: seeeduino_xiao_ble
     shield: totem_right
+
+  # ---- BLUETOOTH DIAGNOSTICS (temporary) ------------------------------------
+  #
+  # settings_reset wipes the settings partition — Bluetooth bonds and the saved
+  # USB/BLE endpoint preference — on every boot. ZMK ships the shield; this repo
+  # never built it, so there was no known-correct one for this board.
+  #
+  # Procedure, and the order matters: flash it to a half, WAIT for it to boot and
+  # finish the wipe (a few seconds — double-tapping straight back into the
+  # bootloader can cut the wipe short), then flash the real firmware. Do both
+  # halves, because a half-reset pair leaves the central authenticating against a
+  # peripheral it can no longer talk to.
+  #
+  # Its own conf sets CONFIG_ZMK_BLE=n, so it cannot advertise and cannot re-pair
+  # while it is running. That is deliberate.
+  - board: seeeduino_xiao_ble
+    shield: settings_reset
+    artifact-name: settings_reset
+
+  # Logging builds. The zmk-usb-logging snippet is the only way to get USB serial
+  # logging in v0.3 — see config/totem.conf for why setting CONFIG_ZMK_USB_LOGGING
+  # alone cannot work. CONFIG_ZMK_LOG_LEVEL_DBG raises the level enough to see BLE
+  # connection, bonding and endpoint-selection events.
+  #
+  # Read it with:
+  #   ls /dev/tty.usbmodem*   then   screen /dev/tty.usbmodemXXXX 115200
+  #   quit screen with  Ctrl-A  then  K  then  Y
+  #
+  # What to look for on the LEFT half:
+  #   "Selected endpoint transport 0"   -> USB won; BLE will look connected but dead
+  #   "Only BLE is ready"               -> what you want when on battery
+  #   peer/bond/security failures       -> a stale bond survived the reset
+  - board: seeeduino_xiao_ble
+    shield: totem_left
+    snippet: zmk-usb-logging
+    cmake-args: -DCONFIG_ZMK_LOG_LEVEL_DBG=y
+    artifact-name: totem_left_logging
+  - board: seeeduino_xiao_ble
+    shield: totem_right
+    snippet: zmk-usb-logging
+    cmake-args: -DCONFIG_ZMK_LOG_LEVEL_DBG=y
+    artifact-name: totem_right_logging
