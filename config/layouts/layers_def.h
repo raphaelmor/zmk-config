@@ -32,6 +32,18 @@
  * on this board. It becomes what a wireless split actually needs: Bluetooth
  * profile select, clear bonds, and the USB/BLE output toggle.
  *
+ * THE BLUETOOTH CONTROLS ARE MIRRORED ONTO BOTH HALVES, ON PURPOSE.
+ *   The layer is activated by a LEFT thumb, so the left-hand copy is reachable
+ *   with the left half alone. That matters because the moment you need BT_CLR is
+ *   the moment the two halves are not talking to each other — and a right-hand-only
+ *   copy is unreachable precisely then. The validation keymap this replaced made
+ *   the same choice for the same reason ("Both reach the same layer, so it works
+ *   with one half alone").
+ *
+ *   Left half, reading outer to inner:  OUT_TOG  BT_CLR  BT_SEL2  BT_SEL1  BT_SEL0
+ *   Right half, reading inner to outer: BT_SEL0  BT_SEL1  BT_SEL2  BT_CLR  OUT_TOG
+ *   So the two copies are spatial mirrors of each other.
+ *
  * Reset and bootloader go on the outer pinky key, which QMK-feature-audit.md:250
  * notes exist on no layer at all in the QMK build. Reaching them needs the Esc
  * thumb plus the far outer key, which is deliberate enough to be safe. The XIAO's
@@ -40,7 +52,7 @@
 #define l_med_label "MEDIA"
 
 //                  LT4              LT3              LT2              LT1              LT0
-#define l_med_LT    &none            &none            &none            &none            &none
+#define l_med_LT    &out OUT_TOG     &bt BT_CLR       &bt BT_SEL 2     &bt BT_SEL 1     &bt BT_SEL 0
 #define l_med_LM    &kp LCTRL        &kp LALT         &kp LGUI         &kp LSHFT        &none
 #define l_med_LB    &none            &none            &kp RALT         &none            &none
 
