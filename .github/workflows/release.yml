@@ -1,0 +1,62 @@
+name: Release firmware
+
+# Attaches the built .uf2 files to a GitHub release, so a release stays useful
+# after the Actions artifact expires (90 days by default).
+#
+# Triggered by pushing a version tag:
+#   git tag -a v1.1.0 -m "..." && git push origin v1.1.0
+#
+# Or run it by hand against a tag that already exists — pick the tag as the ref in
+# the Actions UI. That is how v1.0.0's files were attached after the fact.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  # Same reusable workflow as build.yml, so the release binaries are built exactly
+  # the same way as the ones you test with. Produces an artifact named "firmware".
+  build:
+    uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@v0.3
+
+  attach:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      # Needed to create the release and upload assets. The default token is
+      # read-only on repositories configured that way.
+      contents: write
+    steps:
+      - name: Download the firmware artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: firmware
+          path: firmware
+
+      - name: List what was built
+        run: ls -la firmware/
+
+      - name: Create the release if it does not exist, then attach the .uf2 files
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # A tag pushed without a release needs one created first; upload alone
+          # fails on a missing release. --verify-tag keeps it from inventing a tag.
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "No release for $TAG yet, creating one."
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$TAG" \
+              --generate-notes \
+              --verify-tag
+          fi
+          # --clobber so re-running replaces assets instead of erroring on duplicates.
+          gh release upload "$TAG" firmware/*.uf2 \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+          echo "Attached:"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+            -q '.assets[] | "  \(.name)  \(.size) bytes"'

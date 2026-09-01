@@ -1,5 +1,14 @@
 name: Build ZMK firmware
-on: [push, pull_request, workflow_dispatch]
+
+# Branches and PRs only. Tags are handled by release.yml, which builds the same way
+# and additionally attaches the .uf2 files to the release — without this filter a
+# version tag would build everything twice.
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
